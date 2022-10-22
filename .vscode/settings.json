@@ -6,6 +6,7 @@
         "time_types.h": "c",
         "types.h": "c",
         "unistd.h": "c",
-        "stdio.h": "c"
+        "stdio.h": "c",
+        "cstdio": "c"
     }
 }

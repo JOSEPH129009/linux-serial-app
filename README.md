@@ -7,3 +7,5 @@
 - Currently the program only takes /dev/ttyUSB0
 
 - not yet able to send address to the target
+
+- read(fd, text, sizeof(frame_format_t)); only takes 64bytes

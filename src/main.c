@@ -56,6 +56,14 @@ bool Time_Interval(clock_t time, clock_t gap)
     }
 }
 
+enum{
+    TRANSMIT,
+    RECEIVE,
+    READ,
+    FINISH
+};
+uint32_t state = 0;
+
 
 int main(int argc, char** argv)
 {
@@ -66,15 +74,16 @@ int main(int argc, char** argv)
     const char* filename;
     //----------serialport
     int fd; /*File Descriptor*/
+    long binary_size;
     int len;
-    char text[255];
+    unsigned char text[300];
     //----------read usr input
     char* buffer;
     size_t bufsize = 32;
     size_t characters;
     //----------
 
-    if(argc != 2)
+    if(argc != 2) /*bin file and firmware version for update*/
     {
         perror("wrong argument");
         exit(1);
@@ -93,29 +102,128 @@ int main(int argc, char** argv)
         perror("Error Reporting");
         exit(1);
     }
+    fseek (ptr, 0 , SEEK_END);
+    binary_size = ftell (ptr) ;
+    rewind (ptr);
+
     serial_port_init(&fd);
     // openPort(PORT);  
     // configPort(fd);    
 
-    buffer = (char*) malloc (bufsize * sizeof(char));
 
-    if(buffer == NULL)
+/***************************************************************/
+    // buffer = (char*) malloc (bufsize * sizeof(char));
+
+    // if(buffer == NULL)
+    // {
+    //     perror("unable to allocate buffer");
+    //     exit(1);
+    // }
+
+    // characters = getline(&buffer, &bufsize, stdin);
+    // len = strlen(buffer);
+    // for(int i = 0; i < len; i++)
+    // {
+    //     write(fd, &buffer[i] ,1);
+    //     time = clock();
+    //     printf("wrote %d bytes over UART\n", len);
+
+    //     /*10000 = 10milli seconds brecase CLOCKS_PER_SEC == ((__clock_t) 1000000)*/
+    //     while(!Time_Interval(time, 10000))  /*stm32 uart cannot catch up if stm32 is doing echoing*/
+    //         ;
+    // }
+/*****************************************************************/
+    bootloader_init();
+    // while(1)
+    // {
+    //     switch (state)
+    //     {
+    //     case TRANSMIT:
+    //         len = sizeof(frame_format_t);
+    //         buffer = (char *)&transmit_frame;
+    //         for(int i = 0; i < len; i++)
+    //         {
+    //             if(write(fd, &buffer[i] ,1) < 0)
+    //                 perror("Error transmitting");
+    //         }
+    //         state = RECEIVE;
+    //         break;
+    //     case RECEIVE:
+    //         /* code */
+    //         memset(text, 0, 300);
+    //         len = read(fd, text, sizeof(frame_format_t));
+    //         state = PRINTF;
+    //         break;
+    //     case PRINTF:
+    //         printf("Received %d bytes\n", len);
+    //         for(i=0 ; i<300; i++)
+    //             printf("0x%X ", text[i]);
+    //         // printf("Received string: %s\n", text);
+    //         close(fd); /* Close the serial port */
+    //         fclose(ptr); /* Close file*/
+    //         return 0;
+    //         // break;
+    //     default:
+    //         break;
+    //     }
+    // }
+    int total_rec = 0;
+    int read_ret_val = 0;
+    char temp[300];
+    while(1)
     {
-        perror("unable to allocate buffer");
-        exit(1);
-    }
+        switch (state)
+        {
+        case TRANSMIT:
+            len = sizeof(frame_format_t);
+            buffer = (char *)&transmit_frame;
+            for(int i = 0; i < len; i++)
+            {
+                if(write(fd, &buffer[i] ,1) < 0)
+                    perror("Error transmitting");
+            }
+            state = RECEIVE;
+            break;
+        case RECEIVE:
+            /* code */
+            memset(text, 0, 300);
 
-    characters = getline(&buffer, &bufsize, stdin);
-    len = strlen(buffer);
-    for(int i = 0; i < len; i++)
-    {
-        write(fd, &buffer[i] ,1);
-        time = clock();
-        printf("wrote %d bytes over UART\n", len);
 
-        /*10000 = 10milli seconds brecase CLOCKS_PER_SEC == ((__clock_t) 1000000)*/
-        while(!Time_Interval(time, 10000))  /*stm32 uart cannot catch up if stm32 is doing echoing*/
-            ;
+            while( total_rec < sizeof(frame_format_t) )
+            {
+                read_ret_val = read(fd, temp, sizeof(frame_format_t));
+                if (read_ret_val != -1)
+                {
+                    if ( (total_rec + read_ret_val) >= sizeof(frame_format_t))
+                    { 
+                        read_ret_val = sizeof(frame_format_t) - total_rec;
+                    }
+                    memcpy(&text[total_rec], temp, read_ret_val);
+                    total_rec += read_ret_val;
+                }
+                else
+                {
+                    perror("error reading serial line: ");
+                }
+            }
+            // len = read(fd, text, sizeof(frame_format_t));
+            state = FINISH;
+            break;
+        case READ:
+
+            break;
+        case FINISH:
+            printf("Received %d bytes\n", len);
+            for(i=0 ; i<300; i++)
+                printf("0x%X ", text[i]);
+            // printf("Received string: %s\n", text);
+
+            close(fd); /* Close the serial port */
+            fclose(ptr); /* Close file*/
+            return 0;
+        default:
+            break;
+        }
     }
 
     /*Write to serial port*/
