@@ -59,7 +59,7 @@ bool Time_Interval(clock_t time, clock_t gap)
 enum{
     TRANSMIT,
     RECEIVE,
-    READ,
+    SECOND_READ,
     FINISH
 };
 uint32_t state = 0;
@@ -169,7 +169,8 @@ int main(int argc, char** argv)
     // }
     int total_rec = 0;
     int read_ret_val = 0;
-    char temp[300];
+    char temp[sizeof(frame_format_t)];
+    uint8_t read_counter = 0;
     while(1)
     {
         switch (state)
@@ -187,8 +188,6 @@ int main(int argc, char** argv)
         case RECEIVE:
             /* code */
             memset(text, 0, 300);
-
-
             while( total_rec < sizeof(frame_format_t) )
             {
                 read_ret_val = read(fd, temp, sizeof(frame_format_t));
@@ -207,17 +206,22 @@ int main(int argc, char** argv)
                 }
             }
             // len = read(fd, text, sizeof(frame_format_t));
-            state = FINISH;
+            state = SECOND_READ;
             break;
-        case READ:
-
-            break;
-        case FINISH:
+        case SECOND_READ:
             printf("Received %d bytes\n", len);
             for(i=0 ; i<300; i++)
                 printf("0x%X ", text[i]);
             // printf("Received string: %s\n", text);
-
+            total_rec = 0;
+            if(read_counter == 0)
+            {
+                state = TRANSMIT;
+                read_counter++;
+            }else
+                state = FINISH;
+            break;
+        case FINISH:
             close(fd); /* Close the serial port */
             fclose(ptr); /* Close file*/
             return 0;
