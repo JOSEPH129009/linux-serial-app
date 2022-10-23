@@ -9,22 +9,21 @@
 
 const char PORT[] = "/dev/ttyUSB0"; // determine the USB port names from terminal using $ dmesg | grep tty 
 // Open a port 
-void serial_port_init(int* fd)
+void serial_port_init(int* file_descriptor)
 {
     struct termios options; /*serial ports setting*/
-    *fd = open("/dev/ttyUSB0",O_RDWR | O_NOCTTY);    /* ttyUSB0 is the FT232 based USB2SERIAL Converter   */
+    *file_descriptor = open("/dev/ttyUSB0",O_RDWR | O_NOCTTY);    /* ttyUSB0 is the FT232 based USB2SERIAL Converter   */
                             /* O_RDWR   - Read/Write access to serial port       */
                             /* O_NOCTTY - No terminal will control the process   */
-                            /* Open in blocking mode,read will wait              */
+                            /* O_NONBLOCK - Open in nonblocking mode,read will not wait              */
 
-    if(*fd < 0)					/* Error Checking */
+    if(*file_descriptor < 0)	/* Error Checking */
     {
         perror("Error opening serial port");
         exit(1);
     }
 
-
-    tcgetattr(*fd, &options);	/* Get the current attributes of the Serial port */
+    tcgetattr(*file_descriptor, &options);	/* Get the current attributes of the Serial port */
 
     /* Setting the Baud rate */
     cfsetispeed(&options,B115200); /* Set Read  Speed as 115200                       */
@@ -41,18 +40,17 @@ void serial_port_init(int* fd)
     
     
     options.c_iflag &= ~(IXON | IXOFF | IXANY);          /* Disable XON/XOFF flow control both i/p and o/p */
-    options.c_iflag &= ~(ICANON | ECHO | ECHOE | ISIG);  /* Non Cannonical mode                            */
+    options.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);  /* Non Cannonical mode                            */
 
     options.c_oflag &= ~OPOST;/*No Output Processing*/
-
+    options.c_cc[VMIN]  = 1;
+    options.c_cc[VTIME] = 1;
     /*Apply the settings*/
-    tcflush(*fd, TCIFLUSH); // cleae input buffer
+    tcflush(*file_descriptor, TCIFLUSH); // cleae input buffer
 
-    if((tcsetattr(*fd,TCSANOW,&options)) != 0) /* Set the attributes to the termios structure*/
+    if((tcsetattr(*file_descriptor,TCSANOW,&options)) != 0) /* Set the attributes to the termios structure*/
         printf("\n  ERROR ! in Setting attributes");
     else
         printf("\n  BaudRate = 115200 \n  StopBits = 1 \n  Parity   = none\r\n");
 
 }
-
-

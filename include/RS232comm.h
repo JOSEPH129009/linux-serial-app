@@ -5,7 +5,7 @@
 
 extern const char PORT[]; 
 
-void serial_port_init(int* fd);
+void serial_port_init(int* file_descriptor);
 
 
 #endif /* RS232COMM_H_ */

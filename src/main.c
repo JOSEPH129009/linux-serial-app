@@ -73,7 +73,7 @@ int main(int argc, char** argv)
     int i,k;
     const char* filename;
     //----------serialport
-    int fd; /*File Descriptor*/
+    int file_descriptor; /*File Descriptor*/
     long binary_size;
     int len;
     unsigned char text[300];
@@ -106,9 +106,9 @@ int main(int argc, char** argv)
     binary_size = ftell (ptr) ;
     rewind (ptr);
 
-    serial_port_init(&fd);
+    serial_port_init(&file_descriptor);
     // openPort(PORT);  
-    // configPort(fd);    
+    // configPort(file_descriptor);    
 
 
 /***************************************************************/
@@ -124,7 +124,7 @@ int main(int argc, char** argv)
     // len = strlen(buffer);
     // for(int i = 0; i < len; i++)
     // {
-    //     write(fd, &buffer[i] ,1);
+    //     write(file_descriptor, &buffer[i] ,1);
     //     time = clock();
     //     printf("wrote %d bytes over UART\n", len);
 
@@ -143,7 +143,7 @@ int main(int argc, char** argv)
     //         buffer = (char *)&transmit_frame;
     //         for(int i = 0; i < len; i++)
     //         {
-    //             if(write(fd, &buffer[i] ,1) < 0)
+    //             if(write(file_descriptor, &buffer[i] ,1) < 0)
     //                 perror("Error transmitting");
     //         }
     //         state = RECEIVE;
@@ -151,7 +151,7 @@ int main(int argc, char** argv)
     //     case RECEIVE:
     //         /* code */
     //         memset(text, 0, 300);
-    //         len = read(fd, text, sizeof(frame_format_t));
+    //         len = read(file_descriptor, text, sizeof(frame_format_t));
     //         state = PRINTF;
     //         break;
     //     case PRINTF:
@@ -159,7 +159,7 @@ int main(int argc, char** argv)
     //         for(i=0 ; i<300; i++)
     //             printf("0x%X ", text[i]);
     //         // printf("Received string: %s\n", text);
-    //         close(fd); /* Close the serial port */
+    //         close(file_descriptor); /* Close the serial port */
     //         fclose(ptr); /* Close file*/
     //         return 0;
     //         // break;
@@ -177,10 +177,11 @@ int main(int argc, char** argv)
         {
         case TRANSMIT:
             len = sizeof(frame_format_t);
+            len = 21;
             buffer = (char *)&transmit_frame;
             for(int i = 0; i < len; i++)
             {
-                if(write(fd, &buffer[i] ,1) < 0)
+                if(write(file_descriptor, &buffer[i] ,1) < 0)
                     perror("Error transmitting");
             }
             state = RECEIVE;
@@ -188,24 +189,25 @@ int main(int argc, char** argv)
         case RECEIVE:
             /* code */
             memset(text, 0, 300);
-            while( total_rec < sizeof(frame_format_t) )
-            {
-                read_ret_val = read(fd, temp, sizeof(frame_format_t));
-                if (read_ret_val != -1)
-                {
-                    if ( (total_rec + read_ret_val) >= sizeof(frame_format_t))
-                    { 
-                        read_ret_val = sizeof(frame_format_t) - total_rec;
-                    }
-                    memcpy(&text[total_rec], temp, read_ret_val);
-                    total_rec += read_ret_val;
-                }
-                else
-                {
-                    perror("error reading serial line: ");
-                }
-            }
-            // len = read(fd, text, sizeof(frame_format_t));
+            // while( total_rec < sizeof(frame_format_t) )
+            // {
+            //     read_ret_val = read(file_descriptor, temp, sizeof(frame_format_t));
+            //     if (read_ret_val != -1)
+            //     {
+            //         if ( (total_rec + read_ret_val) >= sizeof(frame_format_t))
+            //         { 
+            //             read_ret_val = sizeof(frame_format_t) - total_rec;
+            //         }
+            //         memcpy(&text[total_rec], temp, read_ret_val);
+            //         total_rec += read_ret_val;
+            //     }
+            //     else
+            //     {
+            //         perror("error reading serial line: ");
+            //     }
+            // }
+            len = read(file_descriptor, text, sizeof(frame_format_t));
+            // memcpy(&text[0], temp, len);
             state = SECOND_READ;
             break;
         case SECOND_READ:
@@ -220,9 +222,11 @@ int main(int argc, char** argv)
                 read_counter++;
             }else
                 state = FINISH;
+
+            state = FINISH;//for febug
             break;
         case FINISH:
-            close(fd); /* Close the serial port */
+            close(file_descriptor); /* Close the serial port */
             fclose(ptr); /* Close file*/
             return 0;
         default:
@@ -236,15 +240,15 @@ int main(int argc, char** argv)
     // len = strlen(text);
     // for(int i; i < len; i++)
     // {
-    //     write(fd, &text[i] ,1);
+    //     write(file_descriptor, &text[i] ,1);
     //     time = clock();
     //     printf("wrote %d bytes over UART\n", len);
     //     while(!Time_Interval(time, 5000))
     //         ;
     // }
-    // len = write(fd, text ,len);
+    // len = write(file_descriptor, text ,len);
     // printf("wrote %d bytes over UART\n", len);
-    // len = write(fd, &transmit_frame ,sizeof(frame_format_t));
+    // len = write(file_descriptor, &transmit_frame ,sizeof(frame_format_t));
     // printf("wrote %ld bytes over UART\n", sizeof(frame_format_t));
     // printf("you have 5s to send me some input data\n");
     // sleep(5);
@@ -253,10 +257,7 @@ int main(int argc, char** argv)
     //     printf("0x%02X ", text[i]);
 
     /*Read from serial port*/
-    memset(text, 0, 255);
-    len = read(fd, text, 255);
-    printf("Received %d bytes\n", len);
-    printf("Received string: %s\n", text);
+
 
     /** verify the bin file   
     i=0;
@@ -271,9 +272,6 @@ int main(int argc, char** argv)
             printf("\r\n");
     }*/
 
-    close(fd); /* Close the serial port */
-    fclose(ptr); /* Close file*/
-    return 0;
 }
 
 
@@ -284,7 +282,7 @@ int main(int argc, char** argv)
 	char* bufptr;									// buffer ponter
 	// Read data from Rx port
 	bufptr = buffer; 
-    while((readin = read(fd, bufptr, buffer + sizeof(buffer) - bufptr - 1)) > 0) {
+    while((readin = read(file_descriptor, bufptr, buffer + sizeof(buffer) - bufptr - 1)) > 0) {
 		bufptr += readin;
 		readinTot += readin;
 		if (bufptr[-1] == '\n' || bufptr[-1] == '\r') break;

@@ -8,5 +8,12 @@
         "unistd.h": "c",
         "stdio.h": "c",
         "cstdio": "c"
-    }
+    },
+    "makefile.launchConfigurations": [
+        {
+            "cwd": "/home/josephjoe1209/Documents/C programming/serial_port/build",
+            "binaryPath": "/home/josephjoe1209/Documents/C programming/serial_port/build/serial.elf",
+            "binaryArgs": []
+        }
+    ]
 }
