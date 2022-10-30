@@ -6,7 +6,7 @@
 /*----------------------------------------------------------------------------------------------------*/
 /* Compiler/IDE  : gcc 11.2.0                                                                        */
 /* Library       :                                                                                    */
-/* Commands      : gcc -o serial serial.c                                                             */
+/* Commands      : make                                                           */
 /* OS            : Linux(x86) (Ubuntu)(Linux Kernel 5.15.0-43-generic)                                            */                              
 /* Programmer    : Joseph.H                                                                           */
 /* Date	         : 2022                                                                               */

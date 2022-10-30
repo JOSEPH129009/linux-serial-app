@@ -9,3 +9,11 @@
 - not yet able to send address to the target
 
 - read(file_descriptor, text, sizeof(frame_format_t)); only takes 64bytes
+
+Header Format - Transmit
+-------------------------------------------------------------------------------------------
+|-SOF-|-BL_HEADER-|-Len-|-Address-|-Size-|-Version-|-FirmwareChecksum-|-FrameChecksum-|-EOF-|
+---1-------1---------2-------4-------4--------3-------------4-----------------1----------1--
+------------------------------------------------------------------------------------------
+
+ 
