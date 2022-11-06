@@ -13,11 +13,12 @@
  * STM32H7 n = 32 (8 word, 256bits) 
  */
 
+#define DATA_LEN   2
+#define DATA_BEGIN 4
+
 //delimeters
 #define BL_START_OF_FRAME  0x55 
 #define BL_END_OF_FRAME    0xFF  
-
-
 /**
  * @brief Header Format
  *          -------------------------------------------------------------------------------------------
@@ -57,6 +58,11 @@ typedef enum bootloader_state
 }bootloader_state;
 
 extern frame_format_t transmit_frame;
-void bootloader_init(void);
+int serial_transmit(int* fd, frame_format_t* t_frame);
+void update_payload_prepare(uint32_t len);
+void update_done_prepare(void);
+void header_update_info_prepare(uint32_t size, uint32_t address, 
+                                uint8_t* version, uint32_t firmware_checksun);
+int parse_frame(const uint8_t* data);
 
 #endif  /*FRANE_H_*/

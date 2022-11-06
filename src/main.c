@@ -28,6 +28,11 @@
 #include "stdbool.h"
 #include "frame.h"
 #include "RS232comm.h"
+#include "bit_field.h"
+#define TOTAL_PROGRAM_ARGUMENT         3
+#define BINFILE                 argc - 2
+#define FIRMWARE_VERSION        argc - 1
+
 
 const char *get_filename_ext(const char *filename) {
     const char *dot = strrchr(filename, '.');
@@ -57,46 +62,46 @@ bool Time_Interval(clock_t time, clock_t gap)
 }
 
 enum{
-    TRANSMIT,
+    TRANSMIT_HEADER,
+    TRANSMIT_DATA,
+    TRANSMIT_DONE,
     RECEIVE,
-    SECOND_READ,
+    PRINT,
     FINISH
 };
 uint32_t state = 0;
-
+#define UpdateDone         bit0
+uint32_t bootloader_flag = 0;
+uint32_t step_counter = 0;
 
 int main(int argc, char** argv)
 {
     clock_t time;
     //-----------file
     FILE *ptr;
-    int i,k;
+    int i;
     const char* filename;
     //----------serialport
     int file_descriptor; /*File Descriptor*/
     long binary_size;
+    uint32_t firmware_checksum = 0;
     int len;
-    unsigned char text[300];
-    //----------read usr input
-    char* buffer;
-    size_t bufsize = 32;
-    size_t characters;
-    //----------
+    unsigned char text[300], k;
 
-    if(argc != 2) /*bin file and firmware version for update*/
+    if(argc != TOTAL_PROGRAM_ARGUMENT) /*bin file and firmware version for update*/
     {
         perror("wrong argument");
         exit(1);
     }
 
-    filename = get_filename_ext(argv[argc - 1]);
+    filename = get_filename_ext(argv[BINFILE]);
     if(strcmp(filename, "bin"))
     {
         perror("argument is not a bin file");
         exit(1);
     }
     
-    ptr = fopen(argv[argc - 1],"rb");  // r for read, b for binary
+    ptr = fopen(argv[BINFILE],"rb");  // r for read, b for binary
     if(ptr==NULL)
     {
         perror("Error Reporting");
@@ -105,13 +110,26 @@ int main(int argc, char** argv)
     fseek (ptr, 0 , SEEK_END);
     binary_size = ftell (ptr) ;
     rewind (ptr);
+    if(binary_size > 0xFFFFFFFFL)
+        perror("Memory Size Too Big");
+    // printf("bin file size : %ld\r\n", binary_size);
 
+    while(!feof(ptr))
+    {
+        if(fread(&k,sizeof(char),1,ptr)) //fread function return number of k read 
+            firmware_checksum += k;
+    }
+    rewind (ptr);
     serial_port_init(&file_descriptor);
     // openPort(PORT);  
     // configPort(file_descriptor);    
 
-
 /***************************************************************/
+    //----------read usr input
+    // char* buffer;
+    // size_t bufsize = 32;
+    // size_t characters;
+    //----------
     // buffer = (char*) malloc (bufsize * sizeof(char));
 
     // if(buffer == NULL)
@@ -133,61 +151,60 @@ int main(int argc, char** argv)
     //         ;
     // }
 /*****************************************************************/
-    bootloader_init();
-    // while(1)
-    // {
-    //     switch (state)
-    //     {
-    //     case TRANSMIT:
-    //         len = sizeof(frame_format_t);
-    //         buffer = (char *)&transmit_frame;
-    //         for(int i = 0; i < len; i++)
-    //         {
-    //             if(write(file_descriptor, &buffer[i] ,1) < 0)
-    //                 perror("Error transmitting");
-    //         }
-    //         state = RECEIVE;
-    //         break;
-    //     case RECEIVE:
-    //         /* code */
-    //         memset(text, 0, 300);
-    //         len = read(file_descriptor, text, sizeof(frame_format_t));
-    //         state = PRINTF;
-    //         break;
-    //     case PRINTF:
-    //         printf("Received %d bytes\n", len);
-    //         for(i=0 ; i<300; i++)
-    //             printf("0x%X ", text[i]);
-    //         // printf("Received string: %s\n", text);
-    //         close(file_descriptor); /* Close the serial port */
-    //         fclose(ptr); /* Close file*/
-    //         return 0;
-    //         // break;
-    //     default:
-    //         break;
-    //     }
-    // }
     int total_rec = 0;
     int read_ret_val = 0;
     char temp[sizeof(frame_format_t)];
-    uint8_t read_counter = 0;
+    int percentage = 0;
+    uint8_t version[3] = {0x01,0x00,0x00}; //v1.0.0
+    i=0;
+    int total_update_counter = 0;
     while(1)
     {
         switch (state)
         {
-        case TRANSMIT:
-            len = sizeof(frame_format_t);
-            len = 21;
-            buffer = (char *)&transmit_frame;
-            for(int i = 0; i < len; i++)
-            {
-                if(write(file_descriptor, &buffer[i] ,1) < 0)
-                    perror("Error transmitting");
-            }
+        case TRANSMIT_HEADER:
+            header_update_info_prepare((uint32_t)binary_size, 0x08020000U, &version[0],firmware_checksum);
+            if(serial_transmit(&file_descriptor, &transmit_frame) < 0)
+                perror("Error transmitting");
+            printf("programming: \r\n");
             state = RECEIVE;
+            break;        
+        case TRANSMIT_DATA:
+            if(!feof(ptr))
+            {
+                if(fread(&k,sizeof(char),1,ptr)) //return number of k read 
+                    transmit_frame.payload[i] = k;
+                i++;
+                if(!(i%256))
+                {
+                    update_payload_prepare(256);
+                    if(serial_transmit(&file_descriptor, &transmit_frame) < 0)
+                        perror("Error transmitting");
+                    state = RECEIVE;
+                }
+            }
+            else
+            {
+                i--;
+                update_payload_prepare(i);
+                if(serial_transmit(&file_descriptor, &transmit_frame) < 0)
+                    perror("Error transmitting");
+                state = RECEIVE;
+            }
+            percentage = (float)total_update_counter/binary_size*100.0;
+            printf("%d %\r", percentage);
             break;
+        case TRANSMIT_DONE:
+            update_done_prepare();
+            if(serial_transmit(&file_descriptor, &transmit_frame) < 0)
+                perror("Error transmitting");
+            bootloader_flag = bit_on(bootloader_flag,UpdateDone);
+            state = RECEIVE;
+            break;   
         case RECEIVE:
             /* code */
+            total_update_counter += i;
+            i=0;
             memset(text, 0, 300);
             // while( total_rec < sizeof(frame_format_t) )
             // {
@@ -207,23 +224,29 @@ int main(int argc, char** argv)
             //     }
             // }
             len = read(file_descriptor, text, sizeof(frame_format_t));
-            // memcpy(&text[0], temp, len);
-            state = SECOND_READ;
+            total_rec+=len;
+            state = PRINT;
             break;
-        case SECOND_READ:
-            printf("Received %d bytes\n", len);
-            for(i=0 ; i<300; i++)
-                printf("0x%X ", text[i]);
-            // printf("Received string: %s\n", text);
-            total_rec = 0;
-            if(read_counter == 0)
-            {
-                state = TRANSMIT;
-                read_counter++;
-            }else
-                state = FINISH;
+        case PRINT:
+            // printf("Received %d bytes\n", len);
+            // for(i=0 ; i<300; i++)
+            //     printf("0x%X ", text[i]);
+            // printf("total counter : %d\r\n",total_update_counter);
+            // printf("\r\n");
 
-            state = FINISH;//for febug
+            if(parse_frame(text) < 0)
+                return 0;
+            state = TRANSMIT_DATA;
+            if(bootloader_flag & UpdateDone)
+            {
+                state = FINISH;
+                printf("\r\n");
+                printf("Firmware update done\r\n");
+            }
+            else if(total_update_counter == binary_size)
+            {
+                state = TRANSMIT_DONE;
+            }
             break;
         case FINISH:
             close(file_descriptor); /* Close the serial port */
@@ -234,61 +257,4 @@ int main(int argc, char** argv)
         }
     }
 
-    /*Write to serial port*/
-    // bootloader_init();
-    // strcpy(text, "Hello from_PC\r\n");
-    // len = strlen(text);
-    // for(int i; i < len; i++)
-    // {
-    //     write(file_descriptor, &text[i] ,1);
-    //     time = clock();
-    //     printf("wrote %d bytes over UART\n", len);
-    //     while(!Time_Interval(time, 5000))
-    //         ;
-    // }
-    // len = write(file_descriptor, text ,len);
-    // printf("wrote %d bytes over UART\n", len);
-    // len = write(file_descriptor, &transmit_frame ,sizeof(frame_format_t));
-    // printf("wrote %ld bytes over UART\n", sizeof(frame_format_t));
-    // printf("you have 5s to send me some input data\n");
-    // sleep(5);
-
-    // for(int i = 0; i < len; i++)
-    //     printf("0x%02X ", text[i]);
-
-    /*Read from serial port*/
-
-
-    /** verify the bin file   
-    i=0;
-    while(!feof(ptr))
-    {
-        if(!(i%16))
-            printf("[%X] =",i);
-        if(fread(&k,sizeof(char),1,ptr)) //return number of k read 
-            printf(" 0x%02X",k);
-        i++;
-        if(!(i%16))
-            printf("\r\n");
-    }*/
-
 }
-
-
-/*
-    sleep(5);
-    int readin, readinTot = 0;						// Bytes read from Rx port
-	char buffer[140] = {0};								// read buffer
-	char* bufptr;									// buffer ponter
-	// Read data from Rx port
-	bufptr = buffer; 
-    while((readin = read(file_descriptor, bufptr, buffer + sizeof(buffer) - bufptr - 1)) > 0) {
-		bufptr += readin;
-		readinTot += readin;
-		if (bufptr[-1] == '\n' || bufptr[-1] == '\r') break;
-	} 
-	*bufptr = '\0';		// Null terminate the string so we can printf() it
-
-    printf("Received %d bytes\n", readinTot);
-    printf("Received string: %s\n", buffer);
-*/

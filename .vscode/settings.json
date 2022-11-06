@@ -8,7 +8,10 @@
         "unistd.h": "c",
         "stdio.h": "c",
         "cstdio": "c",
-        "string.h": "c"
+        "string.h": "c",
+        "rs232comm.h": "c",
+        "frame.h": "c",
+        "stdlib.h": "c"
     },
     "makefile.launchConfigurations": [
         {

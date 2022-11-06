@@ -1,11 +1,28 @@
-#include <stdio.h>		
-#include <string.h>
-#include <unistd.h>		// Unix standard functions
-#include <fcntl.h>		// File control funcitons
-#include <errno.h>		// Error number definitions
-#include <termios.h>	// POSIX terminal control definitions
+
 #include "RS232comm.h"
-#include "stdlib.h"
+
+
+/**
+ * @brief   This function sort serial data for MSB_FIRST & LSB_FIRST on little endian machine.
+ * @param   *dest: data pointer for sorted value
+ * @param   *src: data pointer to be sorted
+ * @param   len: length.
+ * @param   endianness: LSB_FIRST or MSB_FIRST
+ */
+void serial_sort_function(uint8_t *dest,const uint8_t* src, uint8_t len, uint32_t endianness)
+{
+    int i;
+    if(endianness == MSB_FIRST)
+    {
+        for(i=0; i<len; i++)
+            dest[len-i-1] = src[i];
+    }
+    else
+    {
+        for(i=0; i<len; i++)
+            dest[i] = src[i];
+    }
+}
 
 const char PORT[] = "/dev/ttyUSB0"; // determine the USB port names from terminal using $ dmesg | grep tty 
 // Open a port 
