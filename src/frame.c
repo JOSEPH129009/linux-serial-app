@@ -86,7 +86,7 @@ void update_done_prepare(void)
 
 int parse_frame(const uint8_t* data)
 {
-	uint32_t status = 0;
+	int status = 0;
 	uint16_t data_len = 0;
 	uint32_t error_flag = 0;
 	data_len = data[DATA_LEN+1] << 8 | data[DATA_LEN]; //LSB first
@@ -99,14 +99,14 @@ int parse_frame(const uint8_t* data)
 		{
 			serial_sort_function((uint8_t*)&error_flag,&data[DATA_BEGIN],4,LSB_FIRST);
 			printf("NAK, Error Flag:0x%X\r\n",error_flag);
-			return -1;
+			status = -1;
 		}
 		else
 		{
 			printf("NACK frame error\r\n");
 			for(int i = 0; i < 20; i++)
 				printf("0x%02X ", data[i]);
-			return -1;
+			status = -1;
 		}
 	}
 	else if(((data[1] == BL_ACK_FRAME)))
@@ -123,7 +123,7 @@ int parse_frame(const uint8_t* data)
 			printf("ACK frame error\r\n");
 			for(int i = 0; i < 20; i++)
 				printf("0x%02X ", data[i]);
-			return -1;
+			status = -1;
 		}
 
 	}
@@ -132,9 +132,9 @@ int parse_frame(const uint8_t* data)
 		printf("Not ACK Nor ACK!\r\n");
 		for(int i = 0; i < 20; i++)
 			printf("0x%02X ", data[i]);
-		return -1;
+		status = -1;
 	}
 
-	return 0;
+	return status;
 
 }

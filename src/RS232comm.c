@@ -68,6 +68,9 @@ void serial_port_init(int* file_descriptor)
     if((tcsetattr(*file_descriptor,TCSANOW,&options)) != 0) /* Set the attributes to the termios structure*/
         printf("\n  ERROR ! in Setting attributes");
     else
+    {
+        printf("Serial Port Setting: \n");
         printf("\n  BaudRate = 115200 \n  StopBits = 1 \n  Parity   = none\r\n");
+    }
 
 }

@@ -21,7 +21,7 @@
 
 #include <stdio.h>
 #include <unistd.h>  /* UNIX Standard Definitions 	   */ 
-#include <errno.h>   /* ERROR Number Definitions           */
+#include <errno.h>   /* ERROR Number Definitions       */
 #include "string.h"
 #include "stdlib.h"
 #include "time.h"
@@ -29,6 +29,7 @@
 #include "frame.h"
 #include "RS232comm.h"
 #include "bit_field.h"
+#include "ctype.h"
 #define TOTAL_PROGRAM_ARGUMENT         3
 #define BINFILE                 argc - 2
 #define FIRMWARE_VERSION        argc - 1
@@ -73,6 +74,41 @@ uint32_t state = 0;
 #define UpdateDone         bit0
 uint32_t bootloader_flag = 0;
 uint32_t step_counter = 0;
+//----------verion
+char*version_string, *separator;
+unsigned char version[3] = {0};
+void parse_version(char* version_command)
+{
+    int counter = 0, length = 0, i, digit_check = 0;
+    if(strncmp(version_command, "--version=", 10))
+    {
+        perror("version argument is wrong");
+        exit(1);
+    }
+    separator = "=";
+    strtok(version_command, separator);
+    version_string = strtok(NULL, "");
+    separator = ".";
+    /* walk through other tokens */
+    while(version_string != NULL ) {
+        
+        strtok(version_string, separator);
+        length = strlen(version_string);
+        for(i = 0; i < length; i++)
+            if(!isdigit(version_string[i]))
+                digit_check = 1;
+        if(digit_check == 0)
+            version[counter++] = atoi(version_string);
+        digit_check = 0;
+        version_string = strtok(NULL, "");
+    }
+    if(counter != 3)
+    {
+        perror("version argument is wrong");
+        exit(1);
+    }
+
+}
 
 int main(int argc, char** argv)
 {
@@ -100,7 +136,9 @@ int main(int argc, char** argv)
         perror("argument is not a bin file");
         exit(1);
     }
-    
+
+    parse_version(argv[FIRMWARE_VERSION]);
+
     ptr = fopen(argv[BINFILE],"rb");  // r for read, b for binary
     if(ptr==NULL)
     {
@@ -121,41 +159,11 @@ int main(int argc, char** argv)
     }
     rewind (ptr);
     serial_port_init(&file_descriptor);
-    // openPort(PORT);  
-    // configPort(file_descriptor);    
 
-/***************************************************************/
-    //----------read usr input
-    // char* buffer;
-    // size_t bufsize = 32;
-    // size_t characters;
-    //----------
-    // buffer = (char*) malloc (bufsize * sizeof(char));
-
-    // if(buffer == NULL)
-    // {
-    //     perror("unable to allocate buffer");
-    //     exit(1);
-    // }
-
-    // characters = getline(&buffer, &bufsize, stdin);
-    // len = strlen(buffer);
-    // for(int i = 0; i < len; i++)
-    // {
-    //     write(file_descriptor, &buffer[i] ,1);
-    //     time = clock();
-    //     printf("wrote %d bytes over UART\n", len);
-
-    //     /*10000 = 10milli seconds brecase CLOCKS_PER_SEC == ((__clock_t) 1000000)*/
-    //     while(!Time_Interval(time, 10000))  /*stm32 uart cannot catch up if stm32 is doing echoing*/
-    //         ;
-    // }
-/*****************************************************************/
     int total_rec = 0;
     int read_ret_val = 0;
     char temp[sizeof(frame_format_t)];
     int percentage = 0;
-    uint8_t version[3] = {0x01,0x00,0x00}; //v1.0.0
     i=0;
     int total_update_counter = 0;
     while(1)
@@ -166,7 +174,7 @@ int main(int argc, char** argv)
             header_update_info_prepare((uint32_t)binary_size, 0x08020000U, &version[0],firmware_checksum);
             if(serial_transmit(&file_descriptor, &transmit_frame) < 0)
                 perror("Error transmitting");
-            printf("programming: \r\n");
+            printf("programming \n");
             state = RECEIVE;
             break;        
         case TRANSMIT_DATA:
@@ -192,7 +200,7 @@ int main(int argc, char** argv)
                 state = RECEIVE;
             }
             percentage = (float)total_update_counter/binary_size*100.0;
-            printf("%d %\r", percentage);
+            printf("%d % \r", percentage);
             break;
         case TRANSMIT_DONE:
             update_done_prepare();
@@ -206,33 +214,11 @@ int main(int argc, char** argv)
             total_update_counter += i;
             i=0;
             memset(text, 0, 300);
-            // while( total_rec < sizeof(frame_format_t) )
-            // {
-            //     read_ret_val = read(file_descriptor, temp, sizeof(frame_format_t));
-            //     if (read_ret_val != -1)
-            //     {
-            //         if ( (total_rec + read_ret_val) >= sizeof(frame_format_t))
-            //         { 
-            //             read_ret_val = sizeof(frame_format_t) - total_rec;
-            //         }
-            //         memcpy(&text[total_rec], temp, read_ret_val);
-            //         total_rec += read_ret_val;
-            //     }
-            //     else
-            //     {
-            //         perror("error reading serial line: ");
-            //     }
-            // }
             len = read(file_descriptor, text, sizeof(frame_format_t));
             total_rec+=len;
             state = PRINT;
             break;
         case PRINT:
-            // printf("Received %d bytes\n", len);
-            // for(i=0 ; i<300; i++)
-            //     printf("0x%X ", text[i]);
-            // printf("total counter : %d\r\n",total_update_counter);
-            // printf("\r\n");
 
             if(parse_frame(text) < 0)
                 return 0;
@@ -240,6 +226,7 @@ int main(int argc, char** argv)
             if(bootloader_flag & UpdateDone)
             {
                 state = FINISH;
+                printf("100 % \r");
                 printf("\r\n");
                 printf("Firmware update done\r\n");
             }
@@ -258,3 +245,55 @@ int main(int argc, char** argv)
     }
 
 }
+
+
+
+/***********************************************/
+    // ----------read usr input
+    // char* buffer;
+    // size_t bufsize = 32;
+    // size_t characters;
+    // ----------
+    // buffer = (char*) malloc (bufsize * sizeof(char));
+
+    // if(buffer == NULL)
+    // {
+    //     perror("unable to allocate buffer");
+    //     exit(1);
+    // }
+
+    // characters = getline(&buffer, &bufsize, stdin);
+    // len = strlen(buffer);
+    // for(int i = 0; i < len; i++)
+    // {
+    //     write(file_descriptor, &buffer[i] ,1);
+    //     time = clock();
+    //     printf("wrote %d bytes over UART\n", len);
+
+    //     /*10000 = 10milli seconds brecase CLOCKS_PER_SEC == ((__clock_t) 1000000)*/
+    //     while(!Time_Interval(time, 10000))  /*stm32 uart cannot catch up if stm32 is doing echoing*/
+    //         ;
+    // }
+/**********************************************/
+
+/**********************************************/
+// receive more bytes than read function can take
+// read(file_descriptor, text, sizeof(frame_format_t)); only takes 64bytes
+            // while( total_rec < sizeof(frame_format_t) )
+            // {
+            //     read_ret_val = read(file_descriptor, temp, sizeof(frame_format_t));
+            //     if (read_ret_val != -1)
+            //     {
+            //         if ( (total_rec + read_ret_val) >= sizeof(frame_format_t))
+            //         { 
+            //             read_ret_val = sizeof(frame_format_t) - total_rec;
+            //         }
+            //         memcpy(&text[total_rec], temp, read_ret_val);
+            //         total_rec += read_ret_val;
+            //     }
+            //     else
+            //     {
+            //         perror("error reading serial line: ");
+            //     }
+            // }
+/***********************************************/

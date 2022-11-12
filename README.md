@@ -2,13 +2,11 @@
 
 - The serial communucation operates at blocking mode, baudrate: 115200 not yet selectable
 
-- the parameter has to be the path of a bin file taht you want to send over serial comport
-    - e.g. command: ./build/serial.elf /home/josephjoe1209/Documents/myownproject/build/myownproject.bin v1.0.0
+- the first argument has to be the path of a bin file that you want to send over serial comport and the second argument has to be version.
+    - e.g. command: ./build/serial.elf /home/josephjoe1209/Documents/user_app/build/user_app.bin --version=1.0.2
 - Currently the program only takes /dev/ttyUSB0
 
-- not yet able to send address to the target, currently only sends 0x08020000 to MCU
-
-- read(file_descriptor, text, sizeof(frame_format_t)); only takes 64bytes
+- progarm only sends 0x08020000 to MCU for update
 
 # Serial Frame
 
@@ -69,5 +67,8 @@
 - #define BL_NACK_FRAME   0x07
 - sent by uC.the legnth is 4, 4byte Error Flag MSB first
 
+# Link
 
+[**user app**](https://github.com/JOSEPH129009/user-app) \
+[**stmh743zi bootloader app**](https://github.com/JOSEPH129009/stm32h7_bootload_app) 
  
